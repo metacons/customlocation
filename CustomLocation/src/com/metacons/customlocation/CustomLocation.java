@@ -8,6 +8,8 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.util.Log;
+import android.widget.Toast;
 
 public class CustomLocation implements LocationListener {
 
@@ -16,7 +18,7 @@ public class CustomLocation implements LocationListener {
 	Criteria criteria = null;
 	boolean useOnlyGPS = false;
 	boolean useOnlyNetwork = false;
-
+	private final String LOG_TAG = "Custom Location";
 	int selectedConstructor = 0;
 	private int counter = 0;
 
@@ -72,6 +74,10 @@ public class CustomLocation implements LocationListener {
 	}
 
 	private void startWithCriteria() {
+		locman = (LocationManager) context
+				.getSystemService(Context.LOCATION_SERVICE);
+		locman.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
+		handler.postDelayed(runnable, 100);
 
 	}
 
@@ -79,48 +85,10 @@ public class CustomLocation implements LocationListener {
 
 	}
 
-	private Handler handler = new Handler();
-
-	private Runnable runnable = new Runnable() {
-
-		@Override
-		public void run() {
-			try {
-				if (loc != null) {
-					// location was found
-					Message msg = new Message();
-					msg.what = MessageCodes.STAT_OK;
-					msg.obj = "Location was found";
-					locFoundLis.LocationFound(loc, msg);
-				} else {
-					counter++;
-					if (counter == timeout) {
-						locman = (LocationManager) context
-								.getSystemService(Context.LOCATION_SERVICE);
-						locman.requestLocationUpdates(
-								LocationManager.NETWORK_PROVIDER, 0, 0,
-								CustomLocation.this);
-						handler.postDelayed(this, 1000);
-					} else if (counter == timeout * 2) {
-						locman.removeUpdates(CustomLocation.this);
-						Message msg = new Message();
-						msg.what = MessageCodes.STAT_NOTFOUND;
-						msg.obj = "Location not found";
-						locFoundLis.LocationFound(loc, msg);
-					} else {
-						handler.postDelayed(this, 1000);
-					}
-
-				}
-			} catch (Exception ex) {
-				Message msg = new Message();
-				msg.what = MessageCodes.STAT_UNKNOWNERROR;
-				msg.obj = ex.getMessage();
-				locFoundLis.LocationFound(loc, msg);
-			}
-
-		}
-	};
+	private void stopListener() {
+		locman.removeUpdates(this);
+		handler.removeCallbacks(runnable);
+	}
 
 	public int getTimeout() {
 		return timeout;
@@ -150,4 +118,72 @@ public class CustomLocation implements LocationListener {
 
 	}
 
+	/**************************************************/
+	/***** CASE 1- HANDLER 1 *****/
+	/**************************************************/
+	private Handler handler = new Handler() {
+
+	};
+
+	private Runnable runnable = new Runnable() {
+
+		@Override
+		public void run() {
+			try {
+
+				if (loc != null) {
+					// location was found
+					Message msg = new Message();
+					msg.what = MessageCodes.STAT_OK;
+					msg.obj = "Location was found";
+					stopListener();
+					locFoundLis.LocationFound(loc, msg);
+				} else {
+					counter++;
+					if (counter == timeout) {
+						locman = (LocationManager) context
+								.getSystemService(Context.LOCATION_SERVICE);
+						locman.requestLocationUpdates(
+								LocationManager.NETWORK_PROVIDER, 0, 0,
+								CustomLocation.this);
+						Log.d(LOG_TAG, "provider was changed");
+						Log.d(LOG_TAG, "provider was changed");
+						handler.postDelayed(this, 2000);
+					} else if (counter == timeout * 2) {
+						locman.removeUpdates(CustomLocation.this);
+						
+						stopListener();
+						Location locationLastKnown = locman
+								.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+						Message msg = new Message();
+						if(locationLastKnown != null) {
+							msg.what = MessageCodes.STAT_LASKNOWLOCATION;
+							msg.obj = "Last Know Location was sent";
+						}else {
+							msg.what = MessageCodes.STAT_NOTFOUND;
+							msg.obj = "Location not found";
+							Log.d(LOG_TAG, "Location not found");
+						}
+						locFoundLis.LocationFound(loc, msg);
+						
+						
+						
+						
+					} else {
+						handler.postDelayed(this, 2000);
+					}
+
+				}
+			} catch (Exception ex) {
+				Message msg = new Message();
+				msg.what = MessageCodes.STAT_UNKNOWNERROR;
+				msg.obj = ex.getMessage();
+				stopListener();
+				locFoundLis.LocationFound(loc, msg);
+			}
+
+		}
+
+	};
+	/**************************************************/
 }
