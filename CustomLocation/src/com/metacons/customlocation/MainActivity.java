@@ -17,6 +17,7 @@ public class MainActivity extends Activity implements LocationFoundListener {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 		txt = (TextView) findViewById(R.id.txt);
+		
 		CustomLocation c = new CustomLocation(this, this);
 		c.startAPI();
 	}

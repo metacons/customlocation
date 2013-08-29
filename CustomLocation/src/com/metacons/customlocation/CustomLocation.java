@@ -16,39 +16,58 @@ public class CustomLocation implements LocationListener {
 	LocationFoundListener locFoundLis = null;
 	private int timeout = 7;
 	Criteria criteria = null;
-	boolean useOnlyGPS = false;
-	boolean useOnlyNetwork = false;
+
 	private final String LOG_TAG = "Custom Location";
 	int selectedConstructor = 0;
 	private int counter = 0;
 
+	public enum LOC_TYPE{
+		GPS,WIFI;
+	};
+	private LOC_TYPE locType;
 	LocationManager locman = null;
 	Context context = null;
 	private Location loc = null;
 
-	// 0
+	
+	/**
+	 * 
+	 * @param cnx = It is neccessary for location manager
+	 * @param locFound = is callback object
+	 */
 	public CustomLocation(Context cnx, LocationFoundListener locFound) {
 		this.context = cnx;
 		this.locFoundLis = locFound;
 		selectedConstructor = 0;
 	}
 
-	// 1
-	public CustomLocation(Context cnx, Criteria cri) {
+	/**
+	 * 
+	 * @param cnx = It is neccessary for location manager
+	 * @param cri = send a criteria to find location regarding your criteria
+	 * @param locFound = is callback object
+	 */
+	public CustomLocation(Context cnx, Criteria cri, LocationFoundListener locFound) {
 		this.context = cnx;
 		this.criteria = cri;
 		selectedConstructor = 1;
 	}
 
-	// 2
-	public CustomLocation(Context cnx, boolean useOnlyGPS,
-			boolean useOnlyNetwork) {
+	/**
+	 * 
+	 * @param cnx = It is neccessary for location manager
+	 * @param useOnly = send enum type to use only selected provider
+	 * @param locFound = is callback object
+	 */
+	public CustomLocation(Context cnx, LOC_TYPE useOnly,LocationFoundListener locFound) {
 		this.context = cnx;
-		this.useOnlyGPS = useOnlyGPS;
-		this.useOnlyNetwork = useOnlyNetwork;
+		this.locType = useOnly;
 		selectedConstructor = 2;
 	}
 
+	/**
+	 * just call startAPI() method to start location finder
+	 */
 	public void startAPI() {
 		switch (selectedConstructor) {
 		case 0:
@@ -58,7 +77,7 @@ public class CustomLocation implements LocationListener {
 			startWithCriteria();
 			break;
 		case 2:
-			startWithBooleanValues();
+			startWithSelectedType();
 			break;
 		default:
 			break;
@@ -76,13 +95,23 @@ public class CustomLocation implements LocationListener {
 	private void startWithCriteria() {
 		locman = (LocationManager) context
 				.getSystemService(Context.LOCATION_SERVICE);
-		locman.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
+		String provider = locman.getBestProvider(criteria, false);
+		locman.requestLocationUpdates(provider, 0, 0, this);
 		handler.postDelayed(runnable, 100);
 
 	}
 
-	private void startWithBooleanValues() {
-
+	private void startWithSelectedType() {
+		locman = (LocationManager) context
+				.getSystemService(Context.LOCATION_SERVICE);
+		String provider = "";
+		if(locType.equals(LOC_TYPE.GPS)) {
+			provider = LocationManager.GPS_PROVIDER;
+		}else {
+			provider = LocationManager.NETWORK_PROVIDER;
+		}
+		locman.requestLocationUpdates(provider, 0, 0, this);
+		handler2.postDelayed(runnable2, 100);
 	}
 
 	private void stopListener() {
@@ -151,7 +180,7 @@ public class CustomLocation implements LocationListener {
 						handler.postDelayed(this, 2000);
 					} else if (counter == timeout * 2) {
 						locman.removeUpdates(CustomLocation.this);
-						
+
 						stopListener();
 						Location locationLastKnown = locman
 								.getLastKnownLocation(LocationManager.GPS_PROVIDER);
@@ -165,10 +194,10 @@ public class CustomLocation implements LocationListener {
 							Log.d(LOG_TAG, "Location not found");
 						}
 						locFoundLis.LocationFound(loc, msg);
-						
-						
-						
-						
+
+
+
+
 					} else {
 						handler.postDelayed(this, 2000);
 					}
@@ -185,5 +214,66 @@ public class CustomLocation implements LocationListener {
 		}
 
 	};
+	/**************************************************/
+	/**************************************************/
+	/**************************************************/
+	/***** CASE 2- HANDLER 2 *****/
+	/**************************************************/
+	
+	private Handler handler2 = new Handler() {
+
+	};
+
+	private Runnable runnable2 = new Runnable() {
+
+		@Override
+		public void run() {
+			try {
+
+				if (loc != null) {
+					// location was found
+					Message msg = new Message();
+					msg.what = MessageCodes.STAT_OK;
+					msg.obj = "Location was found";
+					stopListener();
+					locFoundLis.LocationFound(loc, msg);
+				} else {
+					counter++;
+					if (counter > timeout*2) {
+						//location was not found
+						locman.removeUpdates(CustomLocation.this);
+
+						stopListener();
+						Location locationLastKnown = locman
+								.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+						Message msg = new Message();
+						if (locationLastKnown != null) {
+							msg.what = MessageCodes.STAT_LASKNOWLOCATION;
+							msg.obj = "Last Know Location was sent";
+						} else {
+							msg.what = MessageCodes.STAT_NOTFOUND;
+							msg.obj = "Location not found";
+							Log.d(LOG_TAG, "Location not found");
+						}
+						locFoundLis.LocationFound(loc, msg);
+						
+					} else {
+						handler.postDelayed(this, 2000);
+
+					}
+
+				}
+			} catch (Exception ex) {
+				Message msg = new Message();
+				msg.what = MessageCodes.STAT_UNKNOWNERROR;
+				msg.obj = ex.getMessage();
+				stopListener();
+				locFoundLis.LocationFound(loc, msg);
+			}
+
+		}
+
+	};
+	
 	/**************************************************/
 }
